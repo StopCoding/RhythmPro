@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">RhythmPro</string>
+    <string name="button">获取蓝牙</string>
 </resources>
