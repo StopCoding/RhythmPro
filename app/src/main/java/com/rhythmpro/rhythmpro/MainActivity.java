@@ -3,10 +3,12 @@ package com.rhythmpro.rhythmpro;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothClass;
 import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothSocket;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.os.Build;
 import android.os.Bundle;
 import android.support.annotation.LayoutRes;
 import android.support.annotation.NonNull;
@@ -20,23 +22,23 @@ import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import org.w3c.dom.Text;
-
+import java.io.IOException;
+import java.io.OutputStream;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
-import java.util.ListIterator;
 import java.util.Set;
+import java.util.UUID;
 
 public class MainActivity extends baseActivity {
 
     private Button button;
     private BluetoothAdapter adapter;
     private ListView deveiceListView;
-    private ArrayAdapter listAdapter;
+    //private ArrayAdapter listAdapter;
+    private DeviceAdapter listAdapter;
     private List<String> deviceNames;
-    private TextView deviceItem;
+    private List<BluetoothDevice> deviceList;
 
     private final BroadcastReceiver receiver = new BroadcastReceiver() {
         @Override
@@ -48,13 +50,13 @@ public class MainActivity extends baseActivity {
 
                 String deviceName = (device.getName() != null)? device.getName(): "";
                 String deviceAddress = device.getAddress();
-                int type = device.getType();
+                if (Build.VERSION.SDK_INT >= 18) {
+                    int type = device.getType();
+                }
                 BluetoothClass deviceClass = device.getBluetoothClass();
                 int major = deviceClass.getDeviceClass();
                 int manor = deviceClass.getMajorDeviceClass();
                 int hasCode = device.hashCode();
-
-
 
                 boolean hasContain = false;
                 for (String name: deviceNames) {
@@ -86,15 +88,7 @@ public class MainActivity extends baseActivity {
         deviceNames = new ArrayList<String>();
         deveiceListView = (ListView) findViewById(R.id.deviceList);
 
-        deviceItem = (TextView) findViewById(R.id.deviceItem);
-        deviceItem.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                Toast.makeText(null, "onclick", Toast.LENGTH_SHORT);
-            }
-        });
-
-        listAdapter = new ArrayAdapter(this, R.layout.devicelist, deviceNames);
+        listAdapter = new DeviceAdapter(this, R.layout.devicelist, deviceNames);
         deveiceListView.setAdapter(listAdapter);
 
         IntentFilter filter = new IntentFilter(BluetoothDevice.ACTION_FOUND);
@@ -104,6 +98,10 @@ public class MainActivity extends baseActivity {
     public void onButtonClick() {
         adapter = BluetoothAdapter.getDefaultAdapter();
         boolean bDiscovery = adapter.isDiscovering();
+//
+//        deviceNames.clear();
+//        deviceList.clear();
+
         Toast.makeText(this, "isDiscovery: "+ String.valueOf(bDiscovery), Toast.LENGTH_SHORT).show();
         if (adapter.isEnabled()) {
             Toast.makeText(this, "蓝牙已打开", Toast.LENGTH_SHORT).show();
@@ -118,7 +116,21 @@ public class MainActivity extends baseActivity {
 
                 String deviceName = device.getName();
                 String deviceAddress = device.getAddress();
-                int deviceType = device.getType();
+
+
+//                try {
+//
+//                    BluetoothSocket socket = device.createInsecureRfcommSocketToServiceRecord(UUID.fromString("00001101-0000-1000-8000-00805F9B34FB"));
+//
+//                    while(!socket.isConnected()) {
+//                        socket.connect();
+//
+//                    }
+//                    boolean connected = socket.isConnected();
+//
+//                } catch (IOException e) {
+//                    e.printStackTrace();
+//                }
             }
 
             adapter.startDiscovery();
@@ -200,10 +212,20 @@ public class MainActivity extends baseActivity {
     class DeviceAdapter extends ArrayAdapter {
 
         private int resourceId;
+        private Context context;
+        private List dataSource;
+
+        public DeviceAdapter(@NonNull Context context, @LayoutRes int resource, @NonNull List objects) {
+            super(context, resource, objects);
+            this.resourceId = resource;
+            this.context = context;
+            this.dataSource = objects;
+        }
 
         public DeviceAdapter(@NonNull Context context, @LayoutRes int resource) {
             super(context, resource);
             this.resourceId = resource;
+            this.context = context;
         }
 
         @NonNull
@@ -211,13 +233,44 @@ public class MainActivity extends baseActivity {
         public View getView(int position, @Nullable View convertView, @NonNull ViewGroup parent) {
             String deviceName = getItem(position).toString();
 
-            LayoutInflater layout = getLayoutInflater();
+            LayoutInflater layout = (LayoutInflater) this.context.getSystemService(Context.LAYOUT_INFLATER_SERVICE);
             View view = layout.inflate(this.resourceId, null);
 
-            TextView deviceNameView = (TextView) view.findViewById(R.id.deviceName);
+//            LayoutInflater layout = getLayoutInflater();
+//            View view = layout.inflate(this.resourceId, null);
+
+            final TextView deviceNameView = (TextView) view.findViewById(R.id.deviceName);
             TextView deviceAddressView = (TextView) view.findViewById(R.id.deviceAddress);
 
             deviceNameView.setText(deviceName);
+            deviceNameView.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    Toast.makeText(context, "toast", Toast.LENGTH_SHORT).show();
+                    adapter.cancelDiscovery();
+
+                    String address = ((TextView) view).getText().toString().split("--")[1];
+                    BluetoothDevice device = adapter.getRemoteDevice(address);
+
+                    try {
+
+                        BluetoothSocket socket = device.createInsecureRfcommSocketToServiceRecord(UUID.fromString("00001101-0000-1000-8000-00805F9B34FB"));
+
+                        if (socket.isConnected()) {
+                            OutputStream output = socket.getOutputStream();
+                        } else {
+                            socket.connect();
+                            boolean connected = socket.isConnected();
+                        }
+
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+
+
+                }
+            });
+
 
             return  view;
         }
